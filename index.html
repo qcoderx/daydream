@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blood Soil</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=MedievalSharp&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'MedievalSharp', cursive;
+            background-color: #1a202c;
+            overflow: hidden; /* Prevent scrollbars */
+        }
+        .font-creepster {
+            font-family: 'Creepster', cursive;
+        }
+        canvas {
+            background-color: #2d3748; /* Default day color */
+            border: 2px solid #718096;
+            transition: background-color 1.5s ease;
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" style="font-size: 24px;"><text y="24" fill="%23f56565">➕</text></svg>') 16 16, auto;
+        }
+        canvas.night {
+            background-color: #171923; /* Night color */
+        }
+        .villager-card {
+            transition: all 0.2s ease-in-out;
+        }
+        .villager-card.selected {
+            background-color: #c53030;
+            border-color: #f56565;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(245, 101, 101, 0.5);
+        }
+        #message-modal {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal-content {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .range-indicator {
+            position: absolute;
+            border: 2px dashed rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            pointer-events: none;
+            display: none;
+        }
+        .hearth-ability-btn {
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+            animation: pulse-red 2s infinite;
+        }
+        @keyframes pulse-red {
+            0% { transform: scale(1); box-shadow: 0 0 20px rgba(239, 68, 68, 0.6); }
+            50% { transform: scale(1.05); box-shadow: 0 0 30px rgba(239, 68, 68, 0.8); }
+            100% { transform: scale(1); box-shadow: 0 0 20px rgba(239, 68, 68, 0.6); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex flex-col items-center justify-center min-h-screen p-2 md:p-4">
+
+    <div class="w-full max-w-7xl mx-auto">
+        <h1 class="text-4xl md:text-6xl font-creepster text-red-500 tracking-wider mb-2 text-center">Blood Soil</h1>
+    </div>
+
+    <div id="game-container" class="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-4">
+        <!-- Game Canvas -->
+        <div id="canvas-container" class="relative mx-auto flex-grow">
+            <canvas id="gameCanvas"></canvas>
+            <div id="range-indicator" class="range-indicator"></div>
+        </div>
+
+        <!-- UI Panel -->
+        <div id="ui-panel" class="w-full lg:w-80 bg-gray-800 p-4 rounded-lg border-2 border-gray-700 flex flex-col gap-3" style="max-height: 85vh; overflow-y: auto;">
+            
+            <!-- Game State -->
+            <div class="text-center p-2 rounded-lg border border-gray-600">
+                <h2 id="phase-display" class="text-3xl font-bold text-yellow-300">DAY</h2>
+                <p class="text-lg">Night <span id="night-display">1</span> of 12</p>
+                <div id="timer-container" class="mt-1">
+                    <p>Nightfall in: <span id="day-timer-display" class="font-bold text-xl">60</span>s</p>
+                </div>
+            </div>
+
+            <!-- Hearth Status -->
+            <div>
+                <h2 class="text-2xl font-bold border-b border-gray-600 pb-1 mb-2">Hearth</h2>
+                <div class="w-full bg-gray-700 rounded-full h-6">
+                    <div id="hearth-health-bar" class="bg-red-500 h-6 rounded-full text-center text-white font-bold transition-all duration-500" style="width: 100%;">
+                        <span id="hearth-health-display">500 / 500</span>
+                    </div>
+                </div>
+            </div>
+             <!-- Resources -->
+            <div>
+                <h2 class="text-2xl font-bold border-b border-gray-600 pb-1 mb-2">Resources</h2>
+                <div class="flex justify-between items-center text-xl">
+                    <span>🥖 Sustenance:</span>
+                    <span id="sustenance-display" class="font-bold text-green-400">50</span>
+                </div>
+                <p id="sustenance-rate-display" class="text-sm text-gray-400 text-right">+5 per second</p>
+            </div>
+            
+            <!-- Villagers -->
+            <div>
+                <h2 class="text-2xl font-bold border-b border-gray-600 pb-1 mb-2">Villagers (<span id="population-display">0</span>)</h2>
+                <p class="text-sm text-gray-400 mb-2">Select a villager, then click on the map to make the ultimate sacrifice.</p>
+                <div id="villagers-container" class="flex flex-col gap-2 max-h-60 overflow-y-auto pr-2">
+                    <!-- Villager cards will be injected by JS -->
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div>
+                 <h2 class="text-2xl font-bold border-b border-gray-600 pb-1 mb-2">Actions</h2>
+                 <button id="repair-hearth-btn" class="w-full bg-blue-700 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
+                     Repair Hearth (1 Builder, 20🥖)
+                 </button>
+                 <button id="hearth-ability-btn" class="hearth-ability-btn w-full bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition mt-2 hidden">
+                     Purifying Light (Cost: 50 ❤️)
+                 </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Game Over / Start Modal -->
+    <div id="game-modal" class="fixed inset-0 bg-black bg-opacity-85 flex items-center justify-center z-50">
+        <div class="modal-content bg-gray-800 border-2 border-red-500 rounded-lg p-8 text-center max-w-md">
+            <h2 id="modal-title" class="text-4xl font-creepster text-red-400 mb-4">The Onslaught Approaches</h2>
+            <p id="modal-text" class="text-lg text-gray-300 mb-6">The Hearth weakens, and the nights grow longer. Your people look to you. Their blood is your soil, their sacrifice your salvation. Survive 12 nights, and the relief caravan may yet find a village here.</p>
+            <button id="modal-button" class="bg-red-700 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-xl transition duration-300 transform hover:scale-105">Brace Ourselves</button>
+        </div>
+    </div>
+    
+    <!-- Custom Message Modal -->
+    <div id="message-modal" class="fixed top-5 right-5 bg-yellow-500 text-gray-900 font-bold p-4 rounded-lg shadow-lg opacity-0 pointer-events-none z-50">
+        <p id="message-text"></p>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const canvasContainer = document.getElementById('canvas-container');
+            const phaseDisplay = document.getElementById('phase-display');
+            const nightDisplay = document.getElementById('night-display');
+            const dayTimerDisplay = document.getElementById('day-timer-display');
+            const timerContainer = document.getElementById('timer-container');
+            const hearthHealthDisplay = document.getElementById('hearth-health-display');
+            const hearthHealthBar = document.getElementById('hearth-health-bar');
+            const sustenanceDisplay = document.getElementById('sustenance-display');
+            const sustenanceRateDisplay = document.getElementById('sustenance-rate-display');
+            const populationDisplay = document.getElementById('population-display');
+            const villagersContainer = document.getElementById('villagers-container');
+            const repairHearthBtn = document.getElementById('repair-hearth-btn');
+            const hearthAbilityBtn = document.getElementById('hearth-ability-btn');
+            const gameModal = document.getElementById('game-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalText = document.getElementById('modal-text');
+            const modalButton = document.getElementById('modal-button');
+            const messageModal = document.getElementById('message-modal');
+            const messageText = document.getElementById('message-text');
+            const rangeIndicator = document.getElementById('range-indicator');
+
+            // --- Game Configuration ---
+            const NIGHTS_TO_SURVIVE = 12;
+            const DAY_DURATION = 60; // seconds
+            const HEARTH_MAX_HEALTH = 500;
+            const HEARTH_REPAIR_AMOUNT = 75;
+            const HEARTH_REPAIR_COST = 20;
+
+            const villagerRoles = {
+                Farmer: { icon: '🧑‍🌾', towerType: 'wardingTotem' },
+                Builder: { icon: '👷', towerType: 'stonewallSentinel' },
+                Forager: { icon: '🌿', towerType: 'longRangeSentry' },
+            };
+
+            const towerTypes = {
+                wardingTotem: { name: 'Warding Totem', color: '#f6e05e', range: 80, effect: { type: 'slow', value: 0.5 }, icon: '🌀' },
+                stonewallSentinel: { name: 'Stonewall Sentinel', color: '#a0aec0', damage: 2, range: 70, attackSpeed: 40, icon: '⚔️' },
+                longRangeSentry: { name: 'Long-Range Sentry', color: '#9f7aea', damage: 3, range: 180, attackSpeed: 80, icon: '🏹' },
+            };
+
+            const monsterTypes = {
+                grunt: { health: 60, speed: 1.5, color: '#48bb78', size: 12, damage: 5 },
+                runner: { health: 40, speed: 3, color: '#4299e1', size: 10, damage: 3 },
+                brute: { health: 250, speed: 1, color: '#ed8936', size: 20, damage: 20 },
+            };
+
+            // --- Game State ---
+            let gamePhase; // 'day', 'night'
+            let dayTimer;
+            let nightNumber;
+            let hearthHealth;
+            let sustenance;
+            let population; // Array of villager objects
+            let towers;
+            let monsters;
+            let projectiles;
+            let particles;
+            let gameRunning = false;
+            let selectedVillagerId = null;
+            let lastTime = 0;
+            let path;
+            let TILE_SIZE;
+
+            // --- Game Setup ---
+            function resizeCanvas() {
+                const containerHeight = canvasContainer.clientHeight;
+                canvas.height = containerHeight;
+                canvas.width = containerHeight * (16 / 9);
+                if (canvas.width > canvasContainer.clientWidth) {
+                    canvas.width = canvasContainer.clientWidth;
+                    canvas.height = canvas.width * (9 / 16);
+                }
+                TILE_SIZE = canvas.width / 24;
+                path = [
+                    { x: 0, y: TILE_SIZE * 6 }, { x: TILE_SIZE * 6, y: TILE_SIZE * 6 },
+                    { x: TILE_SIZE * 6, y: TILE_SIZE * 2 }, { x: TILE_SIZE * 18, y: TILE_SIZE * 2 },
+                    { x: TILE_SIZE * 18, y: TILE_SIZE * 10 }, { x: TILE_SIZE * 10, y: TILE_SIZE * 10 },
+                    { x: TILE_SIZE * 10, y: canvas.height },
+                ];
+            }
+
+            function initializeGame() {
+                resizeCanvas();
+                nightNumber = 1;
+                hearthHealth = HEARTH_MAX_HEALTH;
+                sustenance = 50;
+                population = [];
+                // Initial population
+                for (let i = 0; i < 4; i++) addVillager('Farmer');
+                for (let i = 0; i < 3; i++) addVillager('Builder');
+                for (let i = 0; i < 2; i++) addVillager('Forager');
+                
+                towers = [];
+                monsters = [];
+                projectiles = [];
+                particles = [];
+                selectedVillagerId = null;
+                gameRunning = true;
+                gameModal.style.display = 'none';
+                startDay();
+                requestAnimationFrame(gameLoop);
+            }
+            
+            function addVillager(role) {
+                population.push({ id: Date.now() + Math.random(), role: role });
+            }
+
+            // --- Game Flow (Day/Night Cycle) ---
+            function startDay() {
+                gamePhase = 'day';
+                dayTimer = DAY_DURATION;
+                phaseDisplay.textContent = 'DAY';
+                phaseDisplay.classList.remove('text-red-400');
+                phaseDisplay.classList.add('text-yellow-300');
+                timerContainer.style.display = 'block';
+                hearthAbilityBtn.style.display = 'none';
+                canvas.classList.remove('night');
+                // Spawn a new villager each morning
+                if (nightNumber > 1) {
+                    const roles = Object.keys(villagerRoles);
+                    const randomRole = roles[Math.floor(Math.random() * roles.length)];
+                    addVillager(randomRole);
+                    showMessage(`A survivor has joined! (+1 ${randomRole})`);
+                }
+                updateUI();
+            }
+
+            function startNight() {
+                if (!gameRunning) return;
+                gamePhase = 'night';
+                phaseDisplay.textContent = 'NIGHT';
+                phaseDisplay.classList.remove('text-yellow-300');
+                phaseDisplay.classList.add('text-red-400');
+                timerContainer.style.display = 'none';
+                hearthAbilityBtn.style.display = 'block';
+                canvas.classList.add('night');
+                selectedVillagerId = null; // Deselect villager at night
+                updateUI();
+                spawnWave();
+            }
+            
+            function endNight() {
+                nightNumber++;
+                if (nightNumber > NIGHTS_TO_SURVIVE) {
+                    winGame();
+                    return;
+                }
+                // Consume sustenance
+                const sustenanceCost = population.length;
+                sustenance -= sustenanceCost;
+                showMessage(`Night survived. Sustenance consumed: ${sustenanceCost}`);
+                startDay();
+            }
+
+            // --- Main Game Loop ---
+            function gameLoop(timestamp) {
+                if (!gameRunning) return;
+
+                const deltaTime = (timestamp - lastTime) || 0;
+                lastTime = timestamp;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                drawPath();
+                drawHearth();
+
+                if (gamePhase === 'day') {
+                    dayTimer -= deltaTime / 1000;
+                    dayTimerDisplay.textContent = Math.ceil(dayTimer);
+                    // Generate resources
+                    const farmers = population.filter(v => v.role === 'Farmer').length;
+                    sustenance += (farmers * deltaTime) / 1000;
+                    if (dayTimer <= 0) startNight();
+                    updateUI();
+                } else { // Night phase
+                    updateTowers(deltaTime);
+                    updateMonsters(deltaTime);
+                    updateProjectiles(deltaTime);
+                }
+
+                updateParticles(deltaTime);
+                
+                towers.forEach(t => t.draw());
+                monsters.forEach(m => m.draw());
+                projectiles.forEach(p => p.draw());
+                particles.forEach(p => p.draw());
+
+                checkLossConditions();
+
+                requestAnimationFrame(gameLoop);
+            }
+            
+            // --- Update & Drawing Functions ---
+            function updateUI() {
+                // Stats
+                nightDisplay.textContent = `${nightNumber}`;
+                hearthHealthDisplay.textContent = `${Math.ceil(hearthHealth)} / ${HEARTH_MAX_HEALTH}`;
+                hearthHealthBar.style.width = `${(hearthHealth / HEARTH_MAX_HEALTH) * 100}%`;
+                sustenanceDisplay.textContent = Math.floor(sustenance);
+                const farmers = population.filter(v => v.role === 'Farmer').length;
+                sustenanceRateDisplay.textContent = `+${farmers}/sec from ${farmers} Farmers`;
+                populationDisplay.textContent = population.length;
+                
+                // Villager Roster
+                villagersContainer.innerHTML = '';
+                population.forEach(v => {
+                    const card = document.createElement('div');
+                    card.className = `villager-card flex justify-between items-center p-2 border-2 border-gray-600 rounded-lg cursor-pointer hover:bg-gray-600`;
+                    if (v.id === selectedVillagerId) card.classList.add('selected');
+                    card.dataset.id = v.id;
+                    card.innerHTML = `
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-2">${villagerRoles[v.role].icon}</span>
+                            <span class="font-bold">${v.role}</span>
+                        </div>
+                        <span class="text-sm text-gray-400">Sacrifice</span>
+                    `;
+                    card.addEventListener('click', () => selectVillager(v.id));
+                    villagersContainer.appendChild(card);
+                });
+
+                // Buttons
+                const builders = population.filter(v => v.role === 'Builder').length;
+                repairHearthBtn.disabled = !(builders > 0 && sustenance >= HEARTH_REPAIR_COST);
+            }
+
+            function drawPath() {
+                ctx.strokeStyle = gamePhase === 'day' ? '#4a5568' : '#2d3748';
+                ctx.lineWidth = TILE_SIZE * 0.9;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                ctx.moveTo(path[0].x, path[0].y);
+                for (let i = 1; i < path.length; i++) {
+                    ctx.lineTo(path[i].x, path[i].y);
+                }
+                ctx.stroke();
+            }
+
+            function drawHearth() {
+                const hearthPos = path[path.length - 1];
+                ctx.fillStyle = '#e53e3e';
+                ctx.beginPath();
+                ctx.arc(hearthPos.x, hearthPos.y - TILE_SIZE, TILE_SIZE, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = 'rgba(255, 100, 100, 0.5)';
+                ctx.font = `${TILE_SIZE * 1.5}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('❤️', hearthPos.x, hearthPos.y - TILE_SIZE);
+            }
+
+            // --- Classes (Towers, Monsters, etc.) ---
+            class Tower {
+                constructor(x, y, type) {
+                    this.x = x; this.y = y; this.type = type;
+                    this.details = towerTypes[type];
+                    this.attackCooldown = 0;
+                }
+                draw() {
+                    ctx.fillStyle = this.details.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, TILE_SIZE * 0.4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.font = `${TILE_SIZE * 0.6}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(this.details.icon, this.x, this.y);
+                }
+                update(deltaTime) {
+                    this.attackCooldown -= deltaTime;
+                    if (this.attackCooldown <= 0) {
+                        const target = this.findTarget();
+                        if (target) {
+                            this.attack(target);
+                            this.attackCooldown = 1000 / (this.details.attackSpeed / 50);
+                        }
+                    }
+                }
+                findTarget() {
+                    let closestDist = this.details.range;
+                    let target = null;
+                    for (const monster of monsters) {
+                        const dist = Math.hypot(this.x - monster.x, this.y - monster.y);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            target = monster;
+                        }
+                    }
+                    return target;
+                }
+                attack(target) {
+                    if (this.details.effect?.type === 'slow') {
+                        target.applySlow(this.details.effect.value);
+                    } else {
+                        projectiles.push(new Projectile(this.x, this.y, target, this.details.damage));
+                    }
+                }
+            }
+
+            class Monster {
+                constructor(type) {
+                    this.type = type; this.details = monsterTypes[type];
+                    this.x = path[0].x; this.y = path[0].y;
+                    this.pathIndex = 0; this.health = this.details.health;
+                    this.maxHealth = this.details.health;
+                    this.speed = this.details.speed; this.slowTimer = 0;
+                }
+                draw() {
+                    ctx.fillStyle = this.slowTimer > 0 ? '#63b3ed' : this.details.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.details.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Health bar
+                    const barWidth = this.details.size * 2;
+                    ctx.fillStyle = '#c53030';
+                    ctx.fillRect(this.x - barWidth / 2, this.y - this.details.size - 10, barWidth, 5);
+                    ctx.fillStyle = '#48bb78';
+                    ctx.fillRect(this.x - barWidth / 2, this.y - this.details.size - 10, barWidth * (this.health / this.maxHealth), 5);
+                }
+                update(deltaTime) {
+                    if (this.slowTimer > 0) this.slowTimer -= deltaTime;
+                    const currentSpeed = this.slowTimer > 0 ? this.speed / 2 : this.speed;
+
+                    if (this.pathIndex >= path.length - 1) {
+                        hearthHealth -= this.details.damage;
+                        createParticles(this.x, this.y, this.details.color, 10);
+                        this.health = 0; return;
+                    }
+                    const target = path[this.pathIndex + 1];
+                    const dx = target.x - this.x, dy = target.y - this.y;
+                    const distance = Math.hypot(dx, dy);
+                    if (distance < currentSpeed) {
+                        this.pathIndex++;
+                    } else {
+                        this.x += (dx / distance) * currentSpeed;
+                        this.y += (dy / distance) * currentSpeed;
+                    }
+                }
+                takeDamage(amount) {
+                    this.health -= amount;
+                    if (this.health <= 0) {
+                        sustenance += 0.5; // Small sustenance reward for kills
+                        createParticles(this.x, this.y, this.details.color, 15);
+                    }
+                }
+                applySlow() { this.slowTimer = 500; }
+            }
+            
+            // Other classes (Projectile, Particle) are simplified for brevity but similar to before
+             class Projectile {
+                constructor(x, y, target, damage) {
+                    this.x = x; this.y = y; this.target = target;
+                    this.damage = damage; this.speed = 8;
+                }
+                draw() { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(this.x, this.y, 3, 0, Math.PI * 2); ctx.fill(); }
+                update() {
+                    if(!this.target || this.target.health <= 0) { this.damage = 0; return; }
+                    const dx = this.target.x - this.x, dy = this.target.y - this.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist < this.speed) { this.target.takeDamage(this.damage); this.damage = 0; } 
+                    else { this.x += (dx / dist) * this.speed; this.y += (dy / dist) * this.speed; }
+                }
+            }
+            class Particle {
+                constructor(x, y, color) {
+                    this.x = x; this.y = y; this.color = color;
+                    this.size = Math.random() * 5 + 2;
+                    this.speedX = Math.random() * 6 - 3;
+                    this.speedY = Math.random() * 6 - 3;
+                    this.life = 100;
+                }
+                draw() {
+                    ctx.globalAlpha = this.life / 100; ctx.fillStyle = this.color;
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
+                update() { this.x += this.speedX; this.y += this.speedY; this.life -= 2; }
+            }
+
+            // --- Update Logic ---
+            function updateTowers(dt) { towers.forEach(t => t.update(dt)); }
+            function updateMonsters(dt) {
+                monsters = monsters.filter(m => m.health > 0);
+                monsters.forEach(m => m.update(dt));
+                if (gamePhase === 'night' && monsters.length === 0) endNight();
+            }
+            function updateProjectiles(dt) {
+                projectiles = projectiles.filter(p => p.damage > 0);
+                projectiles.forEach(p => p.update());
+            }
+            function updateParticles(dt) {
+                particles = particles.filter(p => p.life > 0);
+                particles.forEach(p => p.update());
+            }
+
+            // --- Game Actions ---
+            function selectVillager(id) {
+                if (gamePhase === 'night') {
+                    showMessage("Cannot make sacrifices at night!");
+                    return;
+                }
+                selectedVillagerId = selectedVillagerId === id ? null : id;
+                updateUI();
+            }
+
+            function sacrificeVillager(e) {
+                if (gamePhase === 'night' || !selectedVillagerId) return;
+
+                const villager = population.find(v => v.id === selectedVillagerId);
+                if (!villager) return;
+
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                // Simple check to prevent placing on path
+                for (let i = 0; i < path.length - 1; i++) {
+                    const p1 = path[i];
+                    const p2 = path[i+1];
+                    // Check if click is near line segment
+                    const distSq = (x - p1.x) * (x - p1.x) + (y - p1.y) * (y - p1.y);
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    if (dx !== 0 || dy !== 0) {
+                        const t = ((x - p1.x) * dx + (y - p1.y) * dy) / (dx * dx + dy * dy);
+                        const clampedT = Math.max(0, Math.min(1, t));
+                        const closestX = p1.x + clampedT * dx;
+                        const closestY = p1.y + clampedT * dy;
+                        const distToLine = Math.hypot(x - closestX, y - closestY);
+                        if (distToLine < TILE_SIZE) {
+                            showMessage("Cannot build on the path!");
+                            return;
+                        }
+                    }
+                }
+                
+                towers.push(new Tower(x, y, villagerRoles[villager.role].towerType));
+                population = population.filter(v => v.id !== selectedVillagerId);
+                selectedVillagerId = null;
+                updateUI();
+            }
+            
+            function spawnWave() {
+                const monsterCount = 8 + nightNumber * 4;
+                const spawnInterval = Math.max(150, 600 - nightNumber * 20);
+                for (let i = 0; i < monsterCount; i++) {
+                    setTimeout(() => {
+                        if (!gameRunning) return;
+                        let type = 'grunt';
+                        if (nightNumber > 2 && Math.random() < 0.3) type = 'runner';
+                        if (nightNumber > 5 && Math.random() < 0.25) type = 'brute';
+                        monsters.push(new Monster(type));
+                    }, i * spawnInterval);
+                }
+            }
+
+            // --- Win/Loss Conditions ---
+            function checkLossConditions() {
+                if (!gameRunning) return;
+                let reason = null;
+                if (hearthHealth <= 0) reason = 'The Hearth has been destroyed.';
+                if (population.length <= 0 && towers.length <= 0) reason = 'The last villager has fallen.';
+                if (sustenance < 0 && population.length > 0) {
+                     // Starvation penalty
+                    hearthHealth -= 0.1;
+                    if (!document.getElementById('starvation-warning')) {
+                         showMessage("Starvation! The Hearth weakens...");
+                    }
+                }
+                if (reason) loseGame(reason);
+            }
+
+            function loseGame(reason) {
+                gameRunning = false;
+                gameModal.style.display = 'flex';
+                modalTitle.textContent = "The Silence is Your Legacy";
+                modalText.textContent = `${reason} You survived for ${nightNumber - 1} nights. The village is lost.`;
+                modalButton.textContent = "Try Again";
+            }
+            
+            function winGame() {
+                gameRunning = false;
+                gameModal.style.display = 'flex';
+                modalTitle.textContent = "Victory... at a cost.";
+                modalText.textContent = `You survived ${NIGHTS_TO_SURVIVE} nights. The village is safe. The cost was... everything.`;
+                modalButton.textContent = "Play Again";
+            }
+
+            // --- UI Interaction ---
+            function showMessage(msg) { /* ... same as before ... */ }
+            function createParticles(x, y, color, count) { for(let i=0; i<count; i++) particles.push(new Particle(x, y, color)); }
+
+            // --- Event Listeners ---
+            modalButton.addEventListener('click', initializeGame);
+            canvas.addEventListener('click', sacrificeVillager);
+            repairHearthBtn.addEventListener('click', () => {
+                const builderIndex = population.findIndex(v => v.role === 'Builder');
+                if (builderIndex !== -1 && sustenance >= HEARTH_REPAIR_COST) {
+                    sustenance -= HEARTH_REPAIR_COST;
+                    hearthHealth = Math.min(HEARTH_MAX_HEALTH, hearthHealth + HEARTH_REPAIR_AMOUNT);
+                    population.splice(builderIndex, 1); // Builder is consumed in the act
+                    showMessage("A builder sacrifices themself to mend the Hearth!");
+                    updateUI();
+                }
+            });
+            hearthAbilityBtn.addEventListener('click', () => {
+                if (hearthHealth > 50) {
+                    hearthHealth -= 50;
+                    monsters.forEach(m => m.takeDamage(100));
+                    showMessage("A purifying light scours the land!");
+                    updateUI();
+                } else {
+                    showMessage("Hearth is too weak for this power!");
+                }
+            });
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                updateUI();
+            });
+            
+            // Initial setup
+            resizeCanvas();
+        });
+    </script>
+</body>
+</html>
+
