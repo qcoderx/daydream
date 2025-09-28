@@ -164,7 +164,7 @@
             skipDialogueBtn.addEventListener('click', () => { playClickSound(); endStory(); });
 
             // --- Game Config & State (REBALANCED) ---
-            const NIGHTS_TO_SURVIVE = 12; const DAY_DURATION = 60; const HEARTH_MAX_HEALTH = 500; const HEARTH_REPAIR_AMOUNT = 75; const HEARTH_REPAIR_COST = 20; const SACRIFICE_COST = 5; const SUSTENANCE_RATE_MODIFIER = 0.5;
+            const NIGHTS_TO_SURVIVE = 12; const DAY_DURATION = 25; const HEARTH_MAX_HEALTH = 500; const HEARTH_REPAIR_AMOUNT = 75; const HEARTH_REPAIR_COST = 20; const SACRIFICE_COST = 5; const SUSTENANCE_RATE_MODIFIER = 0.5;
             const villagerRoles = { Farmer: { icon: '🧑‍🌾', sacrifice: 'warrior' }, Builder: { icon: '👷', sacrifice: 'warrior' }, Forager: { icon: '🌿', sacrifice: 'tower' }, };
             const warriorTypes = { Farmer: { health: 75, damage: 0.8, color: '#f6e05e', icon: '✊' }, Builder: { health: 150, damage: 1.2, color: '#a0aec0', icon: '🔨' } };
             const towerTypes = { Forager: { name: 'Long-Range Sentry', color: '#9f7aea', damage: 4, range: 180, attackSpeed: 70, icon: '🏹' }, };
