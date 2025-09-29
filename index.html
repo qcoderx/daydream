@@ -42,8 +42,6 @@
             50% { transform: scale(1.05); box-shadow: 0 0 30px rgba(239, 68, 68, 0.8); }
             100% { transform: scale(1); box-shadow: 0 0 20px rgba(239, 68, 68, 0.6); }
         }
-
-        /* Dialogue & Modal Styles */
         #story-container, #how-to-play-container {
             background: radial-gradient(ellipse at bottom, #2d3748 0%, #000 70%);
         }
@@ -66,7 +64,6 @@
 
     <audio id="click-sound" src="audio.mp3" preload="auto" loop></audio>
 
-    <!-- Story Dialogue Container -->
     <div id="story-container" class="absolute inset-0 flex flex-col items-center justify-end p-8 z-50">
         <div id="dialogue-box" class="dialogue-box rounded-lg p-6 text-center shadow-2xl w-full">
             <h3 id="dialogue-char-name" class="text-2xl mb-4">ELARA</h3>
@@ -78,7 +75,6 @@
         </div>
     </div>
     
-    <!-- How to Play Container -->
     <div id="how-to-play-container" class="absolute inset-0 flex-col items-center justify-center p-8 z-40 hidden">
         <div class="dialogue-box rounded-lg p-8 shadow-2xl w-full max-w-2xl text-gray-200">
             <h2 class="text-4xl font-creepster text-red-400 mb-4 text-center">How To Survive</h2>
@@ -98,8 +94,6 @@
         </div>
     </div>
 
-
-    <!-- Main Game UI (hidden initially) -->
     <div id="main-game" class="w-full h-screen flex-col items-center justify-center p-2 md:p-4 hidden">
         <div class="w-full max-w-7xl mx-auto">
             <h1 class="text-4xl md:text-6xl font-creepster text-red-500 tracking-wider mb-2 text-center">Blood Soil</h1>
@@ -121,7 +115,6 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- Elements ---
             const audio = document.getElementById('click-sound');
             const storyContainer = document.getElementById('story-container');
             const dialogueCharName = document.getElementById('dialogue-char-name');
@@ -143,7 +136,6 @@
             const modalText = document.getElementById('modal-text'); const modalButton = document.getElementById('modal-button');
             const messageModal = document.getElementById('message-modal'); const messageText = document.getElementById('message-text');
 
-            // --- Audio Function ---
             let isAudioPlaying = false;
             function playClickSound() { 
                 if(audio && !isAudioPlaying) { 
@@ -153,7 +145,6 @@
                 }
             }
             
-            // --- Story Dialogue ---
             const story = [ { char: "ELARA", text: "Another sunset... another memory of warmth stolen from us. Look at their faces, Kael. They only know the cold, and the sound of the horns." },{ char: "KAEL", text: "They will know the sun again, Elara. We still have hands that can fight. We are not broken yet." },{ char: "ELARA", text: "Walls crumble. Hands tire. We need more than that. We must remember the old ways, the promise our ancestors made to this land." },{ char: "KAEL", text: "What promise? We have nothing but the dirt beneath our feet and the few bodies we have left. How can we fight *them* with *this*?" },{ char: "ELARA", text: "Because we do not build walls of stone. We *become* the wall. We do not sharpen spears. We *become* the spearhead." },{ char: "KAEL", text: "Become... the wall? Elara, what are you saying?" },{ char: "ELARA", text: "The night is long, and the horde is endless. To ensure the dawn has something to rise upon..." },{ char: "ELARA", text: "SACRIFICES MUST BE MADE." }, ];
             let storyIndex = 0;
 
@@ -162,8 +153,7 @@
             function endStory() { storyContainer.style.transition = 'opacity 0.5s ease-out'; storyContainer.style.opacity = '0'; setTimeout(() => { storyContainer.style.display = 'none'; howToPlayContainer.style.display = 'flex'; }, 500); }
             nextDialogueBtn.addEventListener('click', showDialogue);
             skipDialogueBtn.addEventListener('click', () => { playClickSound(); endStory(); });
-
-            // --- Game Config & State (REBALANCED) ---
+            
             const NIGHTS_TO_SURVIVE = 12; const DAY_DURATION = 25; const HEARTH_MAX_HEALTH = 500; const HEARTH_REPAIR_AMOUNT = 75; const HEARTH_REPAIR_COST = 20; const SACRIFICE_COST = 5; const SUSTENANCE_RATE_MODIFIER = 0.5;
             const villagerRoles = { Farmer: { icon: '🧑‍🌾', sacrifice: 'warrior' }, Builder: { icon: '👷', sacrifice: 'warrior' }, Forager: { icon: '🌿', sacrifice: 'tower' }, };
             const warriorTypes = { Farmer: { health: 75, damage: 0.8, color: '#f6e05e', icon: '✊' }, Builder: { health: 150, damage: 1.2, color: '#a0aec0', icon: '🔨' } };
